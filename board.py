@@ -1,11 +1,20 @@
 from PIL import ImageGrab
 import pyautogui
 
-# YOU MAY NEED TO CHANGE THESE VALUES BASED ON YOUR SCREEN SIZE
-LEFT = 570
-TOP = 200
-RIGHT = 1350
-BOTTOM = 875
+import screeninfo
+
+# Get the screen size
+screen = screeninfo.get_monitors()[0]
+screen_width = screen.width
+screen_height = screen.height
+
+# Calculate the left, top, right, and bottom values based on the screen size
+board_width = 7 * 115
+board_height = 6 * 112
+LEFT  = (screen_width - board_width) // 2
+TOP  = (screen_height - board_height) // 2
+RIGHT  = LEFT  + board_width
+BOTTOM   = TOP  + board_height
 
 EMPTY = 0
 RED = 1
@@ -69,7 +78,7 @@ class Board:
     def _get_grid(self):
         cropedImage = self._capture_image()
         pixels = self._convert_image_to_grid(cropedImage)
-        # cropedImage.show()
+        cropedImage.show()
         grid = self._transpose_grid(pixels)
         return grid
 
