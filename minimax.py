@@ -180,6 +180,7 @@ def draw_board(board):
 board = create_board()
 print_board(board)
 game_over = False
+#Gui Goes here
 (algorithm, level) = gui.run()
 pygame.init()
 
