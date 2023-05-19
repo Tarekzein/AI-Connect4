@@ -1,11 +1,19 @@
 import numpy as np
 import random
+import pygame
+import sys
 import math
+import gui
+import time
+import matplotlib.pyplot as plt
 
+# Constants
 BLUE = (0, 0, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
+GREEN = (0, 255, 0)
+WHITE = (255, 255, 255)
 
 ROW_COUNT = 6
 COLUMN_COUNT = 7
@@ -14,15 +22,15 @@ PLAYER = 0
 AI = 1
 
 EMPTY = 0
-PLAYER_PIECE = 1  # RED
-AI_PIECE = 2  # BLUE
+PLAYER_PIECE = 1
+AI_PIECE = 2
 
 WINDOW_LENGTH = 4
 
 
-# def create_board():
-#     board = np.zeros((ROW_COUNT, COLUMN_COUNT))
-#     return board
+def create_board():
+    board = np.zeros((ROW_COUNT, COLUMN_COUNT))
+    return board
 
 
 def drop_piece(board, row, col, piece):
@@ -41,6 +49,48 @@ def get_next_open_row(board, col):
 
 def print_board(board):
     print(np.flip(board, 0))
+
+
+def Performance():
+
+    algorithms = ['MiniMax', 'Alpha']
+    difficulty_levels = ['Easy', 'Medium', 'Hard']
+
+    # Time performance values
+    minimax_times = [4.35, 7.57, 28.49]
+    alpha_times = [7.98, 7.41, 14.75]
+
+    # Plotting the graph
+    x = list(range(len(difficulty_levels)))  # Convert range to a list
+    width = 0.35
+
+    fig, ax = plt.subplots()
+    rects1 = ax.bar([val - width/2 for val in x], minimax_times,
+                    width, label='MiniMax', color='red')  # Set color to red
+    rects2 = ax.bar([val + width/2 for val in x], alpha_times,
+                    width, label='Alpha', color='green')  # Set color to green
+
+    ax.set_ylabel('Time Performance')
+    ax.set_xlabel('Difficulty Level')
+    ax.set_xticks(x)
+    ax.set_xticklabels(difficulty_levels)
+    ax.legend()
+
+    # Adding the values above the bars
+    def autolabel(rects):
+        for rect in rects:
+            height = rect.get_height()
+            ax.annotate('{}'.format(height),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+
+    autolabel(rects1)
+    autolabel(rects2)
+
+    plt.title('Time Performance of Algorithms')
+    plt.show()
 
 
 def winning_move(board, piece):
@@ -123,14 +173,14 @@ def score_position(board, piece):
 
     return score
 
-# Check Winning State HERE
-
 
 def is_terminal_node(board):
     return winning_move(board, PLAYER_PIECE) or winning_move(board, AI_PIECE) or len(get_valid_locations(board)) == 0
 
+# MiniMax Without Alpha-Beta Pruning
 
-def minimax(board, depth, alpha, beta, maximizingPlayer):
+
+def minimax(board, depth, maximizingPlayer):
     valid_locations = get_valid_locations(board)
     is_terminal = is_terminal_node(board)
     if depth == 0 or is_terminal:
@@ -141,10 +191,8 @@ def minimax(board, depth, alpha, beta, maximizingPlayer):
                 return (None, -10000000000000)
             else:  # Game is over, no more valid moves
                 return (None, 0)
-
         else:  # Depth is zero
             return (None, score_position(board, AI_PIECE))
-
     if maximizingPlayer:
         value = -math.inf
         column = random.choice(valid_locations)
@@ -152,7 +200,48 @@ def minimax(board, depth, alpha, beta, maximizingPlayer):
             row = get_next_open_row(board, col)
             b_copy = board.copy()
             drop_piece(b_copy, row, col, AI_PIECE)
-            new_score = minimax(b_copy, depth-1, alpha, beta, False)[1]
+            new_score = minimax(b_copy, depth-1, False)[1]
+            if new_score > value:
+                value = new_score
+                column = col
+        return column, value
+    else:  # Minimizing player
+        value = math.inf
+        column = random.choice(valid_locations)
+        for col in valid_locations:
+            row = get_next_open_row(board, col)
+            b_copy = board.copy()
+            drop_piece(b_copy, row, col, PLAYER_PIECE)
+            new_score = minimax(b_copy, depth-1, True)[1]
+            if new_score < value:
+                value = new_score
+                column = col
+        return column, value
+
+
+# Minimax with Alpha-Beta Pruning
+def minimax_alpha_beta(board, depth, alpha, beta, maximizingPlayer):
+    valid_locations = get_valid_locations(board)
+    is_terminal = is_terminal_node(board)
+    if depth == 0 or is_terminal:
+        if is_terminal:
+            if winning_move(board, AI_PIECE):
+                return (None, 100000000000000)
+            elif winning_move(board, PLAYER_PIECE):
+                return (None, -10000000000000)
+            else:  # Game is over, no more valid moves
+                return (None, 0)
+        else:  # Depth is zero
+            return (None, score_position(board, AI_PIECE))
+    if maximizingPlayer:
+        value = -math.inf
+        column = random.choice(valid_locations)
+        for col in valid_locations:
+            row = get_next_open_row(board, col)
+            b_copy = board.copy()
+            drop_piece(b_copy, row, col, AI_PIECE)
+            new_score = minimax_alpha_beta(
+                b_copy, depth-1, alpha, beta, False)[1]
             if new_score > value:
                 value = new_score
                 column = col
@@ -168,7 +257,8 @@ def minimax(board, depth, alpha, beta, maximizingPlayer):
             row = get_next_open_row(board, col)
             b_copy = board.copy()
             drop_piece(b_copy, row, col, PLAYER_PIECE)
-            new_score = minimax(b_copy, depth-1, alpha, beta, True)[1]
+            new_score = minimax_alpha_beta(
+                b_copy, depth-1, alpha, beta, True)[1]
             if new_score < value:
                 value = new_score
                 column = col
@@ -187,7 +277,6 @@ def get_valid_locations(board):
 
 
 def pick_best_move(board, piece):
-
     valid_locations = get_valid_locations(board)
     best_score = -10000
     best_col = random.choice(valid_locations)
@@ -199,10 +288,114 @@ def pick_best_move(board, piece):
         if score > best_score:
             best_score = score
             best_col = col
-
     return best_col
 
 
-# board = create_board()
-# print_board(board)
-# game_over = False
+def draw_board(board):
+    for c in range(COLUMN_COUNT):
+        for r in range(ROW_COUNT):
+            pygame.draw.rect(screen, BLUE, (c*SQUARESIZE, r *
+                             SQUARESIZE+SQUARESIZE, SQUARESIZE, SQUARESIZE))
+            pygame.draw.circle(screen, WHITE, (int(
+                c*SQUARESIZE+SQUARESIZE/2), int(r*SQUARESIZE+SQUARESIZE+SQUARESIZE/2)), RADIUS)
+
+    for c in range(COLUMN_COUNT):
+        for r in range(ROW_COUNT):
+            if board[r][c] == PLAYER_PIECE:
+                pygame.draw.circle(screen, RED, (int(
+                    c*SQUARESIZE+SQUARESIZE/2), height-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS)
+            elif board[r][c] == AI_PIECE:
+                pygame.draw.circle(screen, GREEN, (int(
+                    c*SQUARESIZE+SQUARESIZE/2), height-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS)
+    pygame.display.update()
+
+
+board = create_board()
+print_board(board)
+game_over = False
+(algorithm, level) = gui.run()
+pygame.init()
+# Performance Measuring Constants
+start_time = time.time()
+
+SQUARESIZE = 100
+
+width = COLUMN_COUNT * SQUARESIZE
+height = (ROW_COUNT+1) * SQUARESIZE
+
+size = (width, height)
+
+RADIUS = int(SQUARESIZE/2 - 5)
+
+screen = pygame.display.set_mode(size)
+draw_board(board)
+pygame.display.update()
+
+myfont = pygame.font.SysFont("product sans", 75)
+
+turn = random.randint(PLAYER, AI)
+
+while not game_over:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            sys.exit()
+
+        pygame.display.update()
+
+        pygame.draw.rect(screen, WHITE, (0, 0, width, SQUARESIZE))
+
+        # Ask for Player 1 Input
+        if turn == PLAYER:
+            if algorithm == 0:  # minimax without alpha
+                col, minimax_score = minimax(board, level, True)
+            else:  # minimax with alpha
+                col, minimax_score = minimax_alpha_beta(
+                    board, level, -math.inf, math.inf, True)
+
+            if is_valid_location(board, col):
+                row = get_next_open_row(board, col)
+                drop_piece(board, row, col, PLAYER_PIECE)
+
+                if winning_move(board, PLAYER_PIECE):
+                    label = myfont.render("AI Agent wins!!", 1, RED)
+                    execution_time = time.time() - start_time
+                    print("Execution time1: ", execution_time)
+                    screen.blit(label, (40, 10))
+                    game_over = True
+
+                turn += 1
+                turn = turn % 2
+
+                print_board(board)
+                draw_board(board)
+
+    # Ask for Player 2 Input
+        if turn == AI and not game_over:
+
+            col = pick_best_move(board, AI_PIECE)
+
+            # Make Computer Play Also with MiniMax Algorithms
+            # col, minimax_score = minimax(board, level, True)
+            # col, minimax_score = minimax_alpha_beta(board, level-1, -math.inf, math.inf, True)
+
+            if is_valid_location(board, col):
+                pygame.time.wait(500)
+                row = get_next_open_row(board, col)
+                drop_piece(board, row, col, AI_PIECE)
+
+                if winning_move(board, AI_PIECE):
+                    label = myfont.render("Computer wins!!", 1, GREEN)
+                    execution_time = time.time() - start_time
+                    print("Execution time2: ", execution_time)
+                    screen.blit(label, (40, 10))
+                    game_over = True
+
+                print_board(board)
+                draw_board(board)
+
+                turn += 1
+                turn = turn % 2
+
+        if game_over:
+            pygame.time.wait(4000)
+            Performance()
